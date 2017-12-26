@@ -9,6 +9,8 @@ twitters <- stringr::str_replace_all(twitters, "\\].*", "")
 # folder for all pics
 dir.create("pics")
 
+# helper function for saving one pic
+# name is actually a path from the project root
 save_pic <- function(url, name){
   magick::image_read(url) %>%
     magick::image_write(name)
@@ -23,8 +25,9 @@ download_pics <- function(chapter){
   tweets <- rtweet::get_timeline(chapter, n = 18000,
                                  include_rts = FALSE, 
                                  filter_media = TRUE)
-  tweets <- dplyr::filter(tweets, !is.na(media_url))
+ 
   urls <- tweets$media_url
+  urls <- urls[!is.na(urls)]
   # no gifs
   urls <- urls[!stringr::str_detect(urls, "tweet\\_video\\_thumb")]
   
@@ -34,3 +37,6 @@ download_pics <- function(chapter){
                  save_pic)
   }
 }
+
+# get pics from all chapters
+purrr::walk(twitters, download_pics)
