@@ -108,18 +108,25 @@ format_image <- function(path){
 
 purrr::walk(unique_pics$path, format_image)
 
+# we need smaller images
+reduce_image <- function(path){
+  magick::image_read(path) %>%
+    magick::image_scale("50x50!") %>%
+    magick::image_write(path)
+}
 
-# re-format logo
-magick::image_read("logo.svg") %>%
-  magick::image_save("logo.jpeg")
+purrr::walk(dir("formatted_pics", full.names = TRUE),
+            reduce_image)
 
 # mosaic making time!
-
+## devtools::install_github("LucyMcGowan/RsimMosaic")
+library("RsimMosaicLDM")
+set.seed("42")
 composeMosaicFromImageRandomOptim(
   originalImageFileName = "logo.jpeg",
   outputImageFileName = "header.jpg",
-  inputTileSize = 500,
-  imagesToUseInMosaic = "formatted_pic", 
-  removeTiles = TRUE,
+  inputTileSize = 100,
+  imagesToUseInMosaic = "formatted_pics", 
+  removeTiles = TRUE, 
   fracLibSizeThreshold = 0.01
 )
