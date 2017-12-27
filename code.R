@@ -118,15 +118,57 @@ reduce_image <- function(path){
 purrr::walk(dir("formatted_pics", full.names = TRUE),
             reduce_image)
 
-# mosaic making time!
-## devtools::install_github("LucyMcGowan/RsimMosaic")
-library("RsimMosaicLDM")
-set.seed("42")
-composeMosaicFromImageRandomOptim(
-  originalImageFileName = "logo.jpeg",
-  outputImageFileName = "header.jpg",
-  inputTileSize = 100,
-  imagesToUseInMosaic = "formatted_pics", 
-  removeTiles = TRUE, 
-  fracLibSizeThreshold = 0.01
-)
+# now work on getting the hue and value for all pics
+# create a data.frame with path, hue, value 
+get_values <- function(path){
+  # get main color
+  colour <- try(rPlotter::extract_colours(path)[1], silent = TRUE)
+  
+  # if error get main color from the original non square pic
+  if(is(colour, "try-error")){
+    colour <- rPlotter::extract_colours(stringr::str_replace(path,
+                                                             "formatted_pics", "pics"))[1]
+  }
+  
+  # translate it
+  rgb <- colorspace::hex2RGB(colour)
+  values <- grDevices::rgb2hsv(t(rgb@coords))
+  
+  tibble::tibble(path = path,
+                 hue = values[1,1],
+                 saturation = values [2,1],
+                 value = values[3,1])
+}
+
+# all values
+pics_col <- purrr::map_df(dir("formatted_pics", full.names = TRUE),
+                        get_values)
+
+# now we want a location for each
+# the dimensions are 18*54. 
+no_rows <- 18
+no_cols <- 54
+pics_col <- dplyr::arrange(pics_col, hue)
+pics_col <- dplyr::mutate(pics_col, column = rep(1:no_cols, each = no_rows))
+pics_col <- dplyr::group_by(pics_col, column) %>%
+  dplyr::arrange(value) %>%
+  dplyr::mutate(row = 1:no_rows) %>%
+  dplyr::ungroup()
+
+pics_col <- dplyr::arrange(pics_col, column, row)
+
+# collage time
+
+make_column <- function(i, files, no_rows){
+  magick::image_read(files[(i*no_rows+1):((i+1)*no_rows)]) %>%
+    magick::image_append(stack = TRUE) %>%
+    magick::image_write(paste0("cols/", i, ".jpg"))
+}
+dir.create("cols")
+purrr::walk(0:(no_cols-1), make_column, files = pics_col$path,
+     no_rows = no_rows)
+
+
+magick::image_read(dir("cols/", full.names = TRUE)) %>%
+  magick::image_append(stack = FALSE) %>%
+  magick::image_write("banner.jpg")
